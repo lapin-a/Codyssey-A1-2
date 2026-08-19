@@ -197,7 +197,11 @@ def search_restaurants(city: str, errors: list, size: int = 5) -> list:
     try:
         resp = requests.get(KAKAO_LOCAL_URL, headers=headers, params=params, timeout=10)
 
+        # 403 / 401 에러 원인 확인용 출력 구문
         if resp.status_code in (401, 403):
+            print(f"\n[Kakao API 오류 발생 - Status {resp.status_code}]")
+            print(f"상세 응답 내용: {resp.text}\n")
+            
             errors.append(
                 f"Kakao Local API 인증 실패 (status={resp.status_code}). 맛집 섹션은 '데이터 없음'으로 처리됩니다."
             )
@@ -371,3 +375,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
