@@ -17,7 +17,7 @@ main.py
 API를 재호출하지 않고 저장된 데이터로 리포트만 재생성한다(캐싱).
 
 사용 기술:
-    - LLM API: Google Gemini (gemini-2.5-flash, google-genai SDK)
+    - LLM API: Google Gemini (gemini-3.5-flash-lite, google-genai SDK)
       -> response_mime_type="application/json"으로 API 레벨에서 JSON 출력을
          강제할 수 있어 1차 추천 단계의 구조화 출력 요구사항에 적합.
     - 지도/장소 검색 API: Kakao Local (키워드 검색)
@@ -31,7 +31,6 @@ import os
 import sys
 from datetime import datetime
 from typing import Optional
-from datetime import datetime
 
 import requests
 from dotenv import load_dotenv
@@ -80,6 +79,29 @@ def _build_recommendation_prompt(date_str: str, retry: bool = False) -> str:
         base += "\n중요: 이전 응답이 JSON 파싱에 실패했습니다. 위 4개의 필수 키만 포함한 순수 JSON 객체만 다시 출력하세요."
     return base
 
+def validate_recommendation(data: dict) -> bool:
+    """1차 추천 JSON의 필수 키와 타입을 검증한다."""
+
+    if not isinstance(data, dict):
+        return False
+
+    if not isinstance(data.get("recommended_city"), str):
+        return False
+
+    if not isinstance(data.get("weather"), str):
+        return False
+
+    if not isinstance(data.get("events"), list):
+        return False
+
+    if not all(isinstance(event, str) for event in data["events"]):
+        return False
+
+    if not isinstance(data.get("reason"), str):
+        return False
+
+    return True
+
 
 def get_recommendation(date_str: str, errors: list) -> Optional[dict]:
     """
@@ -102,14 +124,18 @@ def get_recommendation(date_str: str, errors: list) -> Optional[dict]:
             raw = resp.text
             data = json.loads(raw)
 
-            if all(k in data for k in REQUIRED_RECOMMENDATION_KEYS):
-                if isinstance(data["events"], str):
+            if isinstance(data, dict):
+                # events가 문자열로 오는 경우 리스트로 정규화
+                if isinstance(data.get("events"), str):
                     data["events"] = [data["events"]]
-                return data
-            else:
-                errors.append(
-                    f"1차 추천 응답에 필수 키 누락 (attempt={attempt + 1}): {list(data.keys())}"
-                )
+
+                if validate_recommendation(data):
+                    return data
+
+            errors.append(
+                f"1차 추천 응답의 스키마 또는 타입이 올바르지 않습니다 "
+                f"(attempt={attempt + 1})."
+            )
         except json.JSONDecodeError as e:
             errors.append(f"1차 추천 JSON 파싱 실패 (attempt={attempt + 1}): {e}")
         except Exception as e:
@@ -119,22 +145,30 @@ def get_recommendation(date_str: str, errors: list) -> Optional[dict]:
     return None
 
 
-def generate_report(recommendation: dict, restaurants: list, date_str: str, errors: list) -> str:
+def generate_report(
+    recommendation: dict,
+    restaurants: list,
+    date_str: str,
+    errors: list
+) -> str:
     """
     1차 추천 + 맛집 목록을 종합해 최종 Markdown 리포트를 생성한다.
     """
+
     client = _get_gemini_client()
 
     if restaurants:
         restaurant_text = "\n".join(
-            f"- {r.get('name', '이름없음')} | {r.get('category', '카테고리 정보없음')} | "
-            f"{r.get('address', '주소정보없음')} | {r.get('url', '')}"
+            f"- {r.get('name', '이름없음')} | "
+            f"{r.get('category', '카테고리 정보없음')} | "
+            f"{r.get('address', '주소정보없음')} | "
+            f"{r.get('url', '')}"
             for r in restaurants
         )
     else:
         restaurant_text = "데이터 없음 (맛집 검색 결과가 없거나 API 호출에 실패했습니다.)"
 
-    prompt = f"""당신은 여행 리포트 작가입니다. 아래 정보를 바탕으로 한국어 Markdown 여행 리포트를 작성하세요.
+    prompt = f"""당신은 여행 리포트 작가입니다.
 
 [여행 날짜]
 {date_str}
@@ -148,12 +182,13 @@ def generate_report(recommendation: dict, restaurants: list, date_str: str, erro
 [맛집 검색 결과]
 {restaurant_text}
 
-다음 항목을 모두 포함한 Markdown 문서를 작성하세요 (다른 설명 없이 Markdown 본문만 출력):
+다음 항목을 모두 포함한 Markdown 문서를 작성하세요.
+
 1. # 제목 (추천 지역 이름 포함)
 2. ## 추천 지역 & 추천 이유 요약
 3. ## 날씨 요약
 4. ## 행사/축제 목록
-5. ## 맛집 리스트 (검색 결과가 "데이터 없음"이면 그대로 "데이터 없음"이라고 표기)
+5. ## 맛집 리스트
 6. ## 1일 일정 제안 (오전 / 오후 / 저녁 구성)
 """
 
@@ -161,20 +196,54 @@ def generate_report(recommendation: dict, restaurants: list, date_str: str, erro
         resp = client.models.generate_content(
             model=MODEL_NAME,
             contents=prompt,
-            config=types.GenerateContentConfig(temperature=0.7),
+            config=types.GenerateContentConfig(
+                temperature=0.7
+            ),
         )
+
         return resp.text
+
     except Exception as e:
         errors.append(f"리포트 생성 API 호출 실패: {e}")
-        return (
-            f"# {recommendation.get('recommended_city', '여행지')} 여행 리포트 (생성 실패)\n\n"
-            f"리포트 생성 중 오류가 발생했습니다: {e}\n\n"
-            f"## 원본 추천 정보\n"
-            f"- 날씨: {recommendation.get('weather')}\n"
-            f"- 행사: {', '.join(recommendation.get('events', []))}\n"
-            f"- 이유: {recommendation.get('reason')}\n\n"
-            f"## 맛집 리스트\n{restaurant_text}\n"
-        )
+
+        events = recommendation.get("events", [])
+
+        if events:
+            events_text = "\n".join(
+                f"- {event}"
+                for event in events
+            )
+        else:
+            events_text = "데이터 없음"
+
+        return f"""# {recommendation.get('recommended_city', '여행지')} 여행 리포트
+
+## 추천 지역 & 추천 이유 요약
+
+{recommendation.get('reason', '데이터 없음')}
+
+## 날씨 요약
+
+{recommendation.get('weather', '데이터 없음')}
+
+## 행사/축제 목록
+
+{events_text}
+
+## 맛집 리스트
+
+{restaurant_text}
+
+## 1일 일정 제안
+
+- 오전: 추천 지역의 주요 관광지 또는 명소 방문
+- 오후: 지역 행사, 문화 공간 또는 관광 명소 탐방
+- 저녁: 맛집 방문 후 자유 일정
+
+## Errors
+
+리포트 생성 API 호출에 실패하여 기본 형식의 리포트를 생성했습니다.
+"""
 
 
 # ============================================================
@@ -264,7 +333,7 @@ def validate_date(date_str: str):
         print(f'[오류] 날짜 형식이 올바르지 않습니다: "{date_str}"')
         print('사용법: python main.py -date "YYYY-MM-DD"')
         print(f'예시  : python main.py -date "{today_str}"')
-        sys.exit(0)
+        sys.exit(1)
 
 
 def check_required_env(errors: list) -> bool:

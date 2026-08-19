@@ -31,7 +31,7 @@
 
 ## 사전 준비 사항
 
-* **Python 버전**: Python 3.9 이상 권장
+* **Python 버전**: Python 3.10 이상 권장
 * **필요 API Key**:
   * **Gemini API Key** (필수): Google AI Studio에서 발급
   * **Kakao REST API Key** (선택): Kakao Developers에서 발급 (미설정 시 맛집 검색 기능이 건너뛰어집니다.)
@@ -74,6 +74,14 @@ pip install -r requirements.txt
 GEMINI_API_KEY="your_gemini_api_key_here"
 KAKAO_API_KEY="your_kakao_rest_api_key_here"
 ```
+
+## API 키 보안 주의사항
+
+- 실제 API 키가 포함된 `.env` 파일은 GitHub 등 공개 저장소에 업로드하지 않습니다.
+- `.gitignore`에 `.env`를 추가합니다.
+- API 키는 코드에 직접 작성하지 않습니다.
+- README, 실행 로그, JSON 결과 파일 등에 실제 API 키가 출력되지 않도록 주의합니다.
+- 프로젝트에는 실제 `.env` 대신 `.env.example` 파일만 포함합니다.
 
 ---
 
