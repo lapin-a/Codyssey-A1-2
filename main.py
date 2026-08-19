@@ -31,6 +31,7 @@ import os
 import sys
 from datetime import datetime
 from typing import Optional
+from datetime import datetime
 
 import requests
 from dotenv import load_dotenv
@@ -45,7 +46,7 @@ MODEL_NAME = "gemini-3.5-flash-lite"
 REQUIRED_RECOMMENDATION_KEYS = ["recommended_city", "weather", "events", "reason"]
 KAKAO_LOCAL_URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
 RESULTS_DIR = "results"
-
+today_str = datetime.today().strftime("%Y-%m-%d")
 
 # ============================================================
 # [부분 1] LLM 클라이언트 (구 llm_client.py)
@@ -262,7 +263,7 @@ def validate_date(date_str: str):
     except ValueError:
         print(f'[오류] 날짜 형식이 올바르지 않습니다: "{date_str}"')
         print('사용법: python main.py -date "YYYY-MM-DD"')
-        print('예시  : python main.py -date "2026-08-13"')
+        print(f'예시  : python main.py -date "{today_str}"')
         sys.exit(0)
 
 
