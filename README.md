@@ -10,7 +10,7 @@
 -date "YYYY-MM-DD" 입력
         │
         ▼
-[1] LLM API(OpenAI, gpt-4o-mini)로 1차 추천 생성
+[1] LLM API(Google Gemini, gemini-2.5-flash)로 1차 추천 생성
     -> { recommended_city, weather, events, reason } JSON
     -> JSON 파싱 실패 시 프롬프트를 수정해 최대 1회만 재시도
         │
@@ -28,8 +28,8 @@ results/{date}_report.md  (최종 여행 리포트)
 ```
 
 ### 사용 기술
-- **LLM API**: OpenAI (`gpt-4o-mini`)
-  - 선택 이유: `response_format={"type": "json_object"}` 옵션으로 API 레벨에서
+- **LLM API**: Google Gemini (`gemini-2.5-flash`, `google-genai` SDK)
+  - 선택 이유: `response_mime_type="application/json"` 옵션으로 API 레벨에서
     JSON 출력 강제가 가능해, 1차 추천 단계의 구조화 출력 요구사항을 안정적으로
     만족시킬 수 있습니다.
 - **지도/장소 검색 API**: Kakao Local (키워드 검색 API)
@@ -75,18 +75,19 @@ LLM/맛집 검색 API를 재호출하지 않고 저장된 데이터를 그대로
 실제 키 값을 채워 넣으세요 (아래는 예시 템플릿이며 실제 키가 아닙니다).
 
 ```env
-OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
+GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
 KAKAO_API_KEY="YOUR_KAKAO_REST_API_KEY"
 ```
 
-- `OPENAI_API_KEY`: 필수. 없으면 프로그램이 즉시 종료되며 설정 방법을 안내합니다.
+- `GEMINI_API_KEY`: 필수. 없으면 프로그램이 즉시 종료되며 설정 방법을 안내합니다.
+  [Google AI Studio](https://aistudio.google.com/apikey)에서 발급받을 수 있습니다.
 - `KAKAO_API_KEY`: 선택. 없거나 인증에 실패해도 프로그램은 중단되지 않고
   맛집 섹션이 "데이터 없음"으로 표시됩니다.
 
 환경변수로 직접 지정할 수도 있습니다.
 
 ```bash
-export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
+export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
 export KAKAO_API_KEY="YOUR_KAKAO_REST_API_KEY"
 ```
 
@@ -116,17 +117,21 @@ results/
 - 로그 출력과 `results/` 산출물(JSON/MD)에는 API 키 값이 절대 포함되지
   않도록 설계했습니다 (에러 메시지에도 키 값 자체는 노출하지 않고
   상태 코드/사유만 기록합니다).
-- 만약 실수로 키를 커밋했다면, 즉시 해당 서비스(OpenAI/Kakao) 콘솔에서
+- 만약 실수로 키를 커밋했다면, 즉시 해당 서비스(Google AI Studio/Kakao) 콘솔에서
   키를 폐기(revoke)하고 새 키를 발급받으세요. `git log`에서 이미 커밋된
   히스토리는 `git filter-repo` 등으로 별도로 제거해야 완전히 삭제됩니다.
 
 ## 6. 프로젝트 구조
 
+모든 로직(1차 추천 / 맛집 검색 / 리포트 생성 / CLI 오케스트레이션)은
+`main.py` 한 파일에 통합되어 있습니다. 파일 내부는 아래 3개 섹션으로 구분됩니다.
+
 ```
 travel_report_cli/
-├── main.py            # CLI 진입점, 파이프라인 오케스트레이션
-├── llm_client.py       # OpenAI 호출 (1차 추천 / 최종 리포트 생성)
-├── place_search.py     # Kakao Local API 호출 (맛집 검색)
+├── main.py            # 단일 파일: LLM 호출 + Kakao Local 호출 + CLI 오케스트레이션
+│                       #  [부분 1] LLM 클라이언트 (1차 추천 / 최종 리포트 생성)
+│                       #  [부분 2] 지도/장소 검색 클라이언트 (맛집 검색)
+│                       #  [부분 3] CLI 오케스트레이션 (argparse, 저장, 캐싱)
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
