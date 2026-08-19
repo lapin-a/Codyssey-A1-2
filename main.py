@@ -41,7 +41,7 @@ from google.genai import types
 # 상수
 # ============================================================
 
-MODEL_NAME = "gemini-3.0-flash-lite"
+MODEL_NAME = "gemini-3.5-flash-lite"
 REQUIRED_RECOMMENDATION_KEYS = ["recommended_city", "weather", "events", "reason"]
 KAKAO_LOCAL_URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
 RESULTS_DIR = "results"

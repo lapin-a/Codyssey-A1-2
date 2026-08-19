@@ -1,8 +1,16 @@
 {
   "date": "2026-08-21",
-  "recommendation": null,
+  "recommendation": {
+    "recommended_city": "강릉",
+    "weather": "맑고 화창하며 최고 기온 29도로 해수욕을 즐기기 최적의 날씨입니다.",
+    "events": [
+      "경포 여름 바다 예술제",
+      "강릉 커피 거리 야간 버스킹 페스티벌"
+    ],
+    "reason": "8월 말의 더위를 시원한 동해 바다와 함께 날려버릴 수 있으며, 밤에는 선선한 바닷바람과 함께 커피 거리에서 여유를 즐기기 좋은 국내 최고의 여름 여행지입니다."
+  },
   "restaurants": [],
   "errors": [
-    "1차 추천 API 호출 실패 (attempt=1): 404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3.0-flash-lite is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}}"
+    "Kakao Local API 인증 실패 (status=403). 맛집 섹션은 '데이터 없음'으로 처리됩니다."
   ]
 }
